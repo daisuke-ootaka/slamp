@@ -43,6 +43,9 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
 app.post("/command", async (req, res, next) => {
   try {
+    
+    let message = {};
+
     if (req.body.text) {
       const text = req.body.text;
       const emoji = text.replace(/:([^:]+):/, "$1");
