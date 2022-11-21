@@ -4,24 +4,10 @@ const Hapi = require("hapi"),
   Joi = require("joi"),
   WebClient = require("@slack/client").WebClient,
   url = require("url"),
-  path = require("path"),
-  mongoose = require("mongoose"),
-  User = require("./models/user");
-
-mongoose.Promise = Promise;
-mongoose.connect(process.env.MONGODB_URI);
-
-const getUser = async (id) => {
-  const user = await User.findOne({ id });
-  if (!user)
-    throw new Error(
-      `You are not authorized. Please sign up from ${process.env.URL}`
-    );
-  return user;
-};
+  path = require("path")
 
 const createClient = async (token) => {
-  return new WebClient(token);
+  return new WebClient(process.env.BOT_TOKEN);
 };
 
 const getEmoji = async (client, emoji) => {
@@ -66,12 +52,11 @@ const rootHandler = async (request, h, source, err) => {
     return { text: "An error has occurred :pray:" };
   }
 
-  const { text, user_id: userID, channel_id: channelID } = request.payload;
+  const { text, channel_id: channelID } = request.payload;
 
   try {
     const emoji = text.replace(/:([^:]+):/, "$1");
-    const user = await getUser(userID);
-    const client = await createClient(user.token);
+    const client = await createClient();
     const image = await getEmoji(client, emoji);
 
     await response(client, channelID, image);
@@ -188,7 +173,7 @@ const provision = async () => {
     password: "cookie_encryption_password_secure",
     clientId: process.env.SLACK_CLIENT_ID,
     clientSecret: process.env.SLACK_CLIENT_SECRET,
-    scope: ["commands", "chat:write:user", "emoji:read"],
+    scope: ["commands", "chat:write", "chat:write.public", "emoji:read"],
     isSecure: false,
     forceHttps: true,
   });
