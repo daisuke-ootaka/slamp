@@ -72,7 +72,7 @@ app.post("/command", async (req, res, next) => {
 
     res.json(message);
   } catch (e) {
-    next(error);
+    next(e);
   }
 });
 
