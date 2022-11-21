@@ -4,17 +4,15 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { WebClient } = require("@slack/web-api");
 
-const userClient = new WebClient(process.env.USER_OAUTH_TOKEN);
 const botClient = new WebClient(process.env.BOT_USER_OAUTH_TOKEN);
 
 const getEmoji = async (emoji) => {
   const list = await botClient.emoji.list();
   const emojis = list.emoji || {};
 
-  if (!emojis[emoji])
-    throw new Error(
-      `${emoji} is missing or an error has occurred. please try again :pray:`
-    );
+  if (!emojis[emoji]) {
+    return undefined;
+  }
 
   return emojis[emoji];
 };
@@ -43,25 +41,10 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
 app.post("/command", async (req, res, next) => {
   try {
-    
     let message = {};
 
-    if (req.body.text) {
-      const text = req.body.text;
-      const emoji = text.replace(/:([^:]+):/, "$1");
-      const image = await getEmoji(emoji);
-
-      message = {
-        response_type: "in_channel", // public to the channel
-        attachments: [
-          {
-            color: "#fff",
-            text: "",
-            image_url: image,
-          },
-        ],
-      };
-    } else {
+    // no args error
+    if (!req.body.text) {
       message = {
         response_type: "ephemeral", // private message
         text: ":cat: How to use `/stamp` command:",
@@ -72,6 +55,35 @@ app.post("/command", async (req, res, next) => {
         ],
       };
     }
+
+    const text = req.body.text;
+    const emoji = text.replace(/:([^:]+):/, "$1");
+    const image = await getEmoji(emoji);
+
+    // no custom emoji error
+    if (!image) {
+      message = {
+        response_type: "ephemeral", // private message
+        text: ":cat: custom emoji not found",
+        attachments: [
+          {
+            text: `emoji [${req.body.text}] not found`,
+          },
+        ],
+      };
+    }
+
+    // success
+    message = {
+      response_type: "in_channel", // public to the channel
+      attachments: [
+        {
+          color: "#fff",
+          text: "",
+          image_url: image,
+        },
+      ],
+    };
 
     res.json(message);
   } catch (e) {
