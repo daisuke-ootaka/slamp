@@ -42,7 +42,7 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 app.post("/command", async (req, res, next) => {
   try {
     // log
-    console.log('Request:', req.body)
+    console.log('Request Emoji:', req.body.text)
 
     let message = {};
 
