@@ -42,17 +42,19 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 app.post("/command", async (req, res, next) => {
   try {
     // log
-    console.log('Request Emoji:', req.body.text)
+    console.log("Request Emoji:", req.body.text);
 
     let message = {};
 
     // no args error
     if (!req.body.text) {
-      console.log('no args detected.')
+      console.log("no args detected.");
       message = {
         response_type: "in_channel",
-        text: "`/stamp :cat:` みたいに使ってね"
+        text: "`/stamp :cat:` みたいに使ってね",
       };
+      res.json(message);
+      return;
     }
 
     const text = req.body.text;
@@ -61,11 +63,13 @@ app.post("/command", async (req, res, next) => {
 
     // no custom emoji error
     if (!image) {
-      console.log(`custom emoji [${req.body.text}] not found.`)
+      console.log(`custom emoji [${req.body.text}] not found.`);
       message = {
         response_type: "in_channel",
-        text: `カスタム絵文字に [${req.body.text}] は見つからなかったよ`
+        text: `カスタム絵文字に [${req.body.text}] は見つからなかったよ`,
       };
+      res.json(message);
+      return;
     }
 
     // success
@@ -79,8 +83,8 @@ app.post("/command", async (req, res, next) => {
         },
       ],
     };
-
     res.json(message);
+    return;
   } catch (e) {
     next(e);
   }
