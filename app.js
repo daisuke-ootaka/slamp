@@ -66,7 +66,7 @@ app.post("/command", async (req, res, next) => {
 
     // no custom emoji error
     if (!image) {
-      console.log('custom emoji [${req.body.text}] not found.')
+      console.log(`custom emoji [${req.body.text}] not found.`)
       message = {
         response_type: "ephemeral", // private message
         text: `:cat: custom emoji [${req.body.text}] not found`
