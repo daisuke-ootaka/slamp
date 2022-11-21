@@ -11,7 +11,7 @@ const getEmoji = async (emoji) => {
   const emojis = list.emoji || {};
 
   if (!emojis[emoji]) {
-    return undefined;
+    return null;
   }
 
   return emojis[emoji];
@@ -64,12 +64,7 @@ app.post("/command", async (req, res, next) => {
     if (!image) {
       message = {
         response_type: "ephemeral", // private message
-        text: ":cat: custom emoji not found",
-        attachments: [
-          {
-            text: `emoji [${req.body.text}] not found`,
-          },
-        ],
+        text: `:cat: custom emoji [${req.body.text}] not found`
       };
     }
 
