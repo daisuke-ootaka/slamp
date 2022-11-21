@@ -48,4 +48,8 @@ jspm_packages
 # Yarn Integrity file
 .yarn-integrity
 
+# Mac files
+.DS_Store
+
+# Env file
 .env
