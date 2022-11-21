@@ -41,10 +41,14 @@ app.use(bodyParser.json({ verify: rawBodyBuffer }));
 
 app.post("/command", async (req, res, next) => {
   try {
+    // log
+    console.log('Request:', req.body)
+
     let message = {};
 
     // no args error
     if (!req.body.text) {
+      console.log('no args detected.')
       message = {
         response_type: "ephemeral", // private message
         text: ":cat: How to use `/stamp` command:",
@@ -62,6 +66,7 @@ app.post("/command", async (req, res, next) => {
 
     // no custom emoji error
     if (!image) {
+      console.log('custom emoji [${req.body.text}] not found.')
       message = {
         response_type: "ephemeral", // private message
         text: `:cat: custom emoji [${req.body.text}] not found`
