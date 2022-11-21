@@ -50,13 +50,8 @@ app.post("/command", async (req, res, next) => {
     if (!req.body.text) {
       console.log('no args detected.')
       message = {
-        response_type: "ephemeral", // private message
-        text: ":cat: How to use `/stamp` command:",
-        attachments: [
-          {
-            text: "Type a emoji after the command, _e.g._ `/stamp :cat:`",
-          },
-        ],
+        response_type: "in_channel",
+        text: "`/stamp :cat:` みたいに使ってね"
       };
     }
 
@@ -68,8 +63,8 @@ app.post("/command", async (req, res, next) => {
     if (!image) {
       console.log(`custom emoji [${req.body.text}] not found.`)
       message = {
-        response_type: "ephemeral", // private message
-        text: `:cat: custom emoji [${req.body.text}] not found`
+        response_type: "in_channel",
+        text: `カスタム絵文字に [${req.body.text}] は見つからなかったよ`
       };
     }
 
