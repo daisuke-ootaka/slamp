@@ -1,17 +1,14 @@
 "use strict";
 
-const Hapi = require("hapi"),
-  Joi = require("joi"),
-  WebClient = require("@slack/client").WebClient,
-  url = require("url"),
-  path = require("path")
+const express = require("express");
+const bodyParser = require("body-parser");
+const { WebClient } = require("@slack/web-api");
 
-const createClient = async (token) => {
-  return new WebClient(process.env.BOT_TOKEN);
-};
+const userClient = new WebClient(process.env.USER_OAUTH_TOKEN);
+const botClient = new WebClient(process.env.BOT_USER_OAUTH_TOKEN);
 
-const getEmoji = async (client, emoji) => {
-  const list = await client.emoji.list();
+const getEmoji = async (emoji) => {
+  const list = await botClient.emoji.list();
   const emojis = list.emoji || {};
 
   if (!emojis[emoji])
@@ -22,188 +19,72 @@ const getEmoji = async (client, emoji) => {
   return emojis[emoji];
 };
 
-const response = async (client, id, image) => {
-  await client.chat.postMessage({
-    channel: id,
-    as_user: true,
-    text: "",
-    attachments: [
-      {
-        color: "#fff",
-        text: "",
-        image_url: image,
-      },
-    ],
-  });
+const app = express();
+
+/*
+ * Parse application/x-www-form-urlencoded && application/json
+ * Use body-parser's `verify` callback to export a parsed raw body
+ * that you need to use to verify the signature
+ */
+
+const rawBodyBuffer = (req, res, buf, encoding) => {
+  if (buf && buf.length) {
+    req.rawBody = buf.toString(encoding || "utf8");
+  }
 };
 
-const server = new Hapi.Server({
-  routes: {
-    files: {
-      relativeTo: path.join(__dirname, "public"),
-    },
-  },
-  port: process.env.PORT || 8124,
+app.use(bodyParser.urlencoded({ verify: rawBodyBuffer, extended: true }));
+app.use(bodyParser.json({ verify: rawBodyBuffer }));
+
+/*
+ * Slash Command
+ * Endpoint to receive /httpstatus slash command from Slack.
+ */
+
+app.post("/command", async (req, res, next) => {
+  try {
+    if (req.body.text) {
+      const text = req.body.text;
+      const emoji = text.replace(/:([^:]+):/, "$1");
+      const image = await getEmoji(emoji);
+
+      message = {
+        response_type: "in_channel", // public to the channel
+        attachments: [
+          {
+            color: "#fff",
+            text: "",
+            image_url: image,
+          },
+        ],
+      };
+    } else {
+      message = {
+        response_type: "ephemeral", // private message
+        text: ":cat: How to use `/stamp` command:",
+        attachments: [
+          {
+            text: "Type a emoji after the command, _e.g._ `/stamp :cat:`",
+          },
+        ],
+      };
+    }
+
+    res.json(message);
+  } catch (e) {
+    next(error);
+  }
 });
 
-const rootHandler = async (request, h, source, err) => {
-  if (err) {
-    server.log("error", [err.message, err.stack]);
-    return { text: "An error has occurred :pray:" };
-  }
+app.use((err, req, res) => {
+  console.error(err);
+  res.status(500).send("Internal Server Error");
+});
 
-  const { text, channel_id: channelID } = request.payload;
-
-  try {
-    const emoji = text.replace(/:([^:]+):/, "$1");
-    const client = await createClient();
-    const image = await getEmoji(client, emoji);
-
-    await response(client, channelID, image);
-
-    return null;
-  } catch (e) {
-    server.log("error", [e.message, e.stack]);
-    return { text: e.message };
-  }
-};
-
-const payloadValidationSchema = {
-  token: Joi.string()
-    .valid(process.env.SLACK_VERIFICATION_TOKEN)
-    .options({
-      language: { any: { allowOnly: "xxxxxxxxxxx" } },
-    }),
-  team_id: Joi.any(),
-  team_domain: Joi.any(),
-  channel_id: Joi.any(),
-  channel_name: Joi.any(),
-  user_id: Joi.any(),
-  user_name: Joi.any(),
-  command: Joi.string().valid("/stamp"),
-  text: Joi.string().regex(/^:[^:]+:$/),
-  response_url: Joi.string().uri(),
-  trigger_id: Joi.any(),
-  api_app_id: Joi.any(),
-  is_enterprise_install: Joi.any(),
-  enterprise_id: Joi.any(),
-  enterprise_name: Joi.any(),
-};
-
-const provision = async () => {
-  await server.register({
-    plugin: require("good"),
-    options: {
-      reporters: {
-        consoleReporter: [
-          {
-            module: "good-squeeze",
-            name: "Squeeze",
-            args: [{ log: "*", response: "*", request: "e" }],
-          },
-          {
-            module: "good-console",
-          },
-          "stdout",
-        ],
-        http: [
-          {
-            module: "good-squeeze",
-            name: "Squeeze",
-            args: [{ error: "*" }],
-          },
-        ],
-      },
-    },
-  });
-
-  await server.register(require("inert"));
-
-  server.route({
-    method: "GET",
-    path: "/{param*}",
-    handler: {
-      directory: {
-        path: ".",
-        redirectToSlash: true,
-        index: true,
-      },
-    },
-  });
-
-  await server.register(require("vision"));
-
-  server.views({
-    engines: {
-      html: require("handlebars"),
-    },
-    relativeTo: __dirname,
-    path: "templates",
-    layout: true,
-    layoutPath: path.join(__dirname, "templates/layout"),
-  });
-
-  server.route({
-    method: "POST",
-    path: "/",
-    options: {
-      validate: {
-        payload: payloadValidationSchema,
-        failAction: (request, h, err) => {
-          server.log("error", [err.message, err.details]);
-          return h.response({ text: err.message }).takeover();
-        },
-      },
-    },
-    handler: rootHandler,
-  });
-
-  server.route({
-    method: "GET",
-    path: "/",
-    handler: (request, h) => {
-      return h.view("index");
-    },
-  });
-
-  await server.register(require("bell"));
-
-  server.auth.strategy("slack", "bell", {
-    provider: "slack",
-    password: "cookie_encryption_password_secure",
-    clientId: process.env.SLACK_CLIENT_ID,
-    clientSecret: process.env.SLACK_CLIENT_SECRET,
-    scope: ["commands", "chat:write", "chat:write.public", "emoji:read"],
-    isSecure: false,
-    forceHttps: true,
-  });
-
-  server.route({
-    method: ["GET", "POST"],
-    path: "/auth",
-    options: {
-      auth: "slack",
-      handler: (request) => {
-        if (!request.auth.isAuthenticated) {
-          return `Authentication failed due to: ${request.auth.error.message}`;
-        }
-
-        const { user_id: id, access_token: token } =
-          request.auth.credentials.profile;
-        return User.update({ id }, { id, token }, { upsert: true })
-          .then(() => {
-            return "Success";
-          })
-          .catch(() => {
-            return `An error has occurred. please try agein. <a href="${process.env.URL}">${process.env.URL}</a>`;
-          });
-      },
-    },
-  });
-
-  server.start(() => {
-    console.log("Server running at:", server.info.uri);
-  });
-};
-
-provision();
+const server = app.listen(process.env.PORT || 5000, () => {
+  console.log(
+    "Express server listening on port %d in %s mode",
+    server.address().port,
+    app.settings.env
+  );
+});
